@@ -6,7 +6,9 @@ use cortex_m_rt::entry;
 use defmt_rtt as _;
 use panic_probe as _;
 
-use embedded_hal::digital::v2::{InputPin,OutputPin, ToggleableOutputPin};
+use embedded_hal::pwm::SetDutyCycle;
+use embedded_hal::digital::{InputPin,OutputPin};
+
 use rp2040_hal as hal;
 use hal::gpio::*;
 use hal::{
@@ -16,6 +18,7 @@ use hal::{
     Sio
 };
 use hal::multicore::{Multicore, Stack};
+//use hal::{pwm::{InputHighRunning, Slices}};
 
 // USB Device support
 use usb_device::{class_prelude::*, prelude::*};
@@ -32,7 +35,11 @@ pub static BOOT_LOADER: [u8; 256] = rp2040_boot2::BOOT_LOADER_W25Q080;
 
 
 const FIRMWARE_VERSION: [u8; 3] = [1, 0, 0]; 
+/// The minimum PWM value (i.e. LED brightness) we want
+const LOW: u16 = 0;
 
+/// The maximum PWM value (i.e. LED brightness) we want
+const HIGH: u16 = 25000;
 
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 
@@ -40,28 +47,69 @@ fn core1_task(sys_freq: u32) -> ! {
     let mut pac = unsafe { pac::Peripherals::steal() };
     let core = unsafe { pac::CorePeripherals::steal() };
 
-    let sio = Sio::new(pac.SIO);
+    let mut sio = Sio::new(pac.SIO);
     let pins = hal::gpio::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
         sio.gpio_bank0,
         &mut pac.RESETS,
     );
+    // Init PWMs
+    let mut pwm_slices = hal::pwm::Slices::new(pac.PWM, &mut pac.RESETS);
+    
+    
+    
+    // Configure PWM4
+    let pwm = &mut pwm_slices.pwm4;
+    let pwm_motor = &mut pwm_slices.pwm0;
+    pwm.set_ph_correct();
+    pwm.enable();
+
+    pwm_motor.set_ph_correct();
+    pwm_motor.enable();
+
+    
+    let channel_b = &mut pwm.channel_b;
+    channel_b.output_to(pins.gpio9);
+    
+    let channel_a = &mut pwm_motor.channel_a;
+    channel_a.output_to(pins.gpio0);
+    channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+    
+
 
     // monitor battery charing pin
-    let charging_pin: Pin<bank0::Gpio2, FunctionSio<SioInput>, PullNone> = pins.gpio2.into_floating_input();
-    let mut led_w = pins.gpio9.into_push_pull_output();
+    let mut charging_pin: Pin<bank0::Gpio2, FunctionSio<SioInput>, PullNone> = pins.gpio2.into_floating_input();
+    
 
     
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
     loop {
         // toggle LED when charging not done
         if charging_pin.is_low().unwrap() {
-            led_w.toggle().unwrap();
+            // Ramp brightness up
+            for i in LOW..=HIGH {
+                delay.delay_us(8);
+                let _ = channel_b.set_duty_cycle(i);
+            }
+
+            // Ramp brightness down
+            for i in (LOW..=HIGH).rev() {
+                delay.delay_us(8);
+                let _ = channel_b.set_duty_cycle(i);
+            }
+
+
+
+            
         } else {
-            led_w.set_high().unwrap();
+            channel_b.set_duty_cycle(60000).unwrap();
         }
-        delay.delay_ms(500); // 0.2Hz freq. 
+        if let Some(word) =  sio.fifo.read(){
+            channel_a.set_duty_cycle(word as u16).unwrap();
+        }
+
+        delay.delay_ms(800); // 0.125Hz freq. 
     }
 }
 
@@ -208,6 +256,9 @@ fn main() -> ! {
                         }
                         _ =>{}                            
                     }    
+                } else if decoded_data_length == 2 {
+                    sio.fifo.write((((decoded_data[0] as u16)<<8)+(decoded_data[1] as u16)) as u32);
+
                 }                   
 
             }
