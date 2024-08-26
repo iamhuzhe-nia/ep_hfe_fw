@@ -6,27 +6,16 @@ use cortex_m_rt::entry;
 use defmt_rtt as _;
 use panic_probe as _;
 
-use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::digital::v2::InputPin;
-
-use embedded_hal::{ digital::v2::ToggleableOutputPin}; //blocking::i2c::Write, serial::Read, adc::OneShot};
-
-use embedded_hal::spi::MODE_0;
-use embedded_hal::blocking::spi::Write;
-use fugit::RateExtU32;
-
+use embedded_hal::digital::v2::{InputPin,OutputPin, ToggleableOutputPin};
 use rp2040_hal as hal;
 use hal::gpio::*;
 use hal::{
-    clocks::init_clocks_and_plls,        
+    clocks::{Clock, init_clocks_and_plls},        
     watchdog::Watchdog,
     pac,
     Sio
 };
-use hal::pio::PIOExt;
-use rp2040_hal::clocks::Clock;
 use hal::multicore::{Multicore, Stack};
-use embedded_hal::digital::StatefulOutputPin;
 
 // USB Device support
 use usb_device::{class_prelude::*, prelude::*};
@@ -34,40 +23,24 @@ use usb_device::{class_prelude::*, prelude::*};
 // USB Communications Class Device support
 use usbd_serial::SerialPort;
 
-
 use corncobs::*;
-
 
 use rp2040_boot2;
 #[link_section = ".boot2"]
 #[used]
 pub static BOOT_LOADER: [u8; 256] = rp2040_boot2::BOOT_LOADER_W25Q080;
 
-// 9/13/2023: CLASSE 2.0.0
-// 3/25/2024: CLASSE 2.1.0
-// 6/6/2024   v 2.2.0   for classE driver v1
 
-// 8/4/2024 v2.2.3 for tim box v3
-
-const FIRMWARE_VERSION: [u8; 3] = [2, 2, 3]; 
+const FIRMWARE_VERSION: [u8; 3] = [1, 0, 0]; 
 
 
-/// Stack for core 1
-///
-/// Core 0 gets its stack via the normal route - any memory not used by static values is
-/// reserved for stack and initialised by cortex-m-rt.
-/// To get the same for Core 1, we would need to compile everything separately and
-/// modify the linker file for both programs, and that's quite annoying.
-/// So instead, core1.spawn takes a [usize] which gets used for the stack.
-/// NOTE: We use the `Stack` struct here to ensure that it has 32-byte alignment, which allows
-/// the stack guard to take up the least amount of usable RAM.
 static mut CORE1_STACK: Stack<4096> = Stack::new();
 
 fn core1_task(sys_freq: u32) -> ! {
     let mut pac = unsafe { pac::Peripherals::steal() };
     let core = unsafe { pac::CorePeripherals::steal() };
 
-    let mut sio = Sio::new(pac.SIO);
+    let sio = Sio::new(pac.SIO);
     let pins = hal::gpio::Pins::new(
         pac.IO_BANK0,
         pac.PADS_BANK0,
@@ -75,22 +48,20 @@ fn core1_task(sys_freq: u32) -> ! {
         &mut pac.RESETS,
     );
 
-    let mut charging_pin: Pin<bank0::Gpio2, FunctionSio<SioInput>, PullNone> = pins.gpio2.into_floating_input();
+    // monitor battery charing pin
+    let charging_pin: Pin<bank0::Gpio2, FunctionSio<SioInput>, PullNone> = pins.gpio2.into_floating_input();
     let mut led_w = pins.gpio9.into_push_pull_output();
+
+    
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
     loop {
+        // toggle LED when charging not done
         if charging_pin.is_low().unwrap() {
             led_w.toggle().unwrap();
         } else {
             led_w.set_high().unwrap();
         }
-        delay.delay_ms(1000);
-     //   let input = sio.fifo.read();
-        // if let Some(word) = input {
-            //delay.delay_ms(word);
-            //led_pin.toggle().unwrap();
-            //sio.fifo.write_blocking(CORE1_TASK_COMPLETE);
-        // };
+        delay.delay_ms(500); // 0.2Hz freq. 
     }
 }
 
@@ -126,7 +97,7 @@ fn main() -> ! {
     });
 
 
-    let mut delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
+    let _delay = cortex_m::delay::Delay::new(core.SYST, clocks.system_clock.freq().to_Hz());
 
 
     let pins = hal::gpio::Pins::new(
@@ -136,26 +107,14 @@ fn main() -> ! {
         &mut pac.RESETS,
     );
 
-    let mut motor = pins.gpio0.into_push_pull_output();
     let mut led_g = pins.gpio1.into_push_pull_output();
-    
-    //let mut charging_pin: Pin<bank0::Gpio2, FunctionSio<SioInput>, PullNone> = pins.gpio2.into_floating_input();
+    led_g.set_high().unwrap(); // turn on green LED when power-on
 
+    //let mut motor = pins.gpio0.into_push_pull_output();
+    //motor.set_high().unwrap(); // turn on motor for testing 
 
-    led_g.set_high().unwrap(); // turn on green LED
-    //led_w.set_high().unwrap(); // turn on white LED
-    motor.set_high().unwrap(); // turn on white LED
+    // use PWM to drive motor
 
-    // loop{
-    //     if charging_pin.is_low().unwrap() {
-    //         led_w.toggle().unwrap();
-    //     } else {
-    //         led_w.set_high().unwrap();
-    //     }
-    //     delay.delay_ms(1000);
-
-
-    // }
 
     
     
@@ -230,10 +189,7 @@ fn main() -> ! {
                 state = Fsm::IDLE;
                 let decoded_data_length = decode_buf(&serial_buffer[..serial_buffer_index], &mut decoded_data).unwrap();
 
-                if decoded_data_length == 3 {
-                    
-                    
-                } else if decoded_data_length == 1 {
+                if decoded_data_length == 1 {
                     match decoded_data[0] {
                         21 => {
                             let n = encode_buf(&FIRMWARE_VERSION, &mut encoded);
@@ -254,12 +210,6 @@ fn main() -> ! {
                     }    
                 }                   
 
-                // } else if decoded_data_length == 2 { // write DAC value: 8-bit
-                //     // spi_cs.set_low().unwrap();
-                //     // spi.write(&[(decoded_data[0] as u16) <<4]).unwrap();
-                //     // spi_cs.set_high().unwrap();
-                //     tx.write(((decoded_data[0] as u32)<<8) + decoded_data[1] as u32);
-                // }
             }
 
 
