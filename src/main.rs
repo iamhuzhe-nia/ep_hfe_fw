@@ -18,6 +18,7 @@ use hal::{
     Sio,
 };
 use rp2040_hal as hal;
+//use rp2040_hal::pwm::B;
 //use hal::{pwm::{InputHighRunning, Slices}};
 
 // // USB Device support
@@ -69,9 +70,11 @@ fn core1_task(sys_freq: u32) -> ! {
         pins.gpio2.into_floating_input();
 
     let mut delay = cortex_m::delay::Delay::new(core.SYST, sys_freq);
+    let mut one_shot: bool = true;
     loop {
         // toggle LED when charging not done
         if charging_pin.is_low().unwrap() {
+            one_shot = true;
             // Ramp brightness up
             for i in LOW..=HIGH {
                 delay.delay_us(8);
@@ -84,7 +87,13 @@ fn core1_task(sys_freq: u32) -> ! {
                 let _ = channel_b.set_duty_cycle(i);
             }
         } else {
-            channel_b.set_duty_cycle(60000).unwrap();
+            if one_shot {
+                one_shot = false;
+                channel_b.set_duty_cycle(60000).unwrap();
+                delay.delay_ms(5_000);
+            } else {
+                channel_b.set_duty_cycle_fully_off().unwrap();
+            }
         }
         // if let Some(word) =  sio.fifo.read(){
         //     channel_a.set_duty_cycle(word as u16).unwrap();
