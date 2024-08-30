@@ -98,9 +98,6 @@ fn core1_task(sys_freq: u32) -> ! {
                 delay.delay_us(8);
                 let _ = channel_b.set_duty_cycle(i);
             }
-
-
-
             
         } else {
             channel_b.set_duty_cycle(60000).unwrap();
