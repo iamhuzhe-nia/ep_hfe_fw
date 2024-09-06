@@ -160,71 +160,82 @@ fn main() -> ! {
     channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
 
     // channel_a.set_duty_cycle(5).unwrap();
-    loop {
-        //notification 1
-        // on 200ms
-        channel_a.set_duty_cycle(10).unwrap();
-        delay.delay_ms(200);
+    // loop {
+    // one time only; no loop
+    delay.delay_ms(90_000);
+
+    //notification 3
+    for _ in 0..2 {
+        // on 100ms
+        channel_a.set_duty_cycle(20).unwrap();
+        delay.delay_ms(100);
         // off 100ms
         channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
         delay.delay_ms(100);
-        // on 500ms
-        channel_a.set_duty_cycle(10).unwrap();
-        delay.delay_ms(500);
-
-        channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-
-        delay.delay_ms(60_000);
-
-        //notification 2
-        for _ in 0..3 {
-            // on 200ms
-            channel_a.set_duty_cycle(20).unwrap();
-            delay.delay_ms(200);
-            // off 100ms
-            channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-            delay.delay_ms(100);
-        }
-
-        delay.delay_ms(60_000);
-
-        //notification 3
-        for _ in 0..2 {
-            // on 100ms
-            channel_a.set_duty_cycle(20).unwrap();
-            delay.delay_ms(100);
-            // off 100ms
-            channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-            delay.delay_ms(100);
-        }
-
-        delay.delay_ms(300);
-
-        for _ in 0..2 {
-            // on 100ms
-            channel_a.set_duty_cycle(20).unwrap();
-            delay.delay_ms(100);
-            // off 100ms
-            channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-            delay.delay_ms(100);
-        }
-
-        delay.delay_ms(60_000);
-
-        //notification 4
-        // on 500ms
-        channel_a.set_duty_cycle(10).unwrap();
-        delay.delay_ms(500);
-        // off 100ms
-        channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-        delay.delay_ms(100);
-        // on 200ms
-        channel_a.set_duty_cycle(10).unwrap();
-        delay.delay_ms(200);
-        channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
-
-        delay.delay_ms(60_000);
     }
+
+    delay.delay_ms(300);
+
+    for _ in 0..2 {
+        // on 100ms
+        channel_a.set_duty_cycle(20).unwrap();
+        delay.delay_ms(100);
+        // off 100ms
+        channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+        delay.delay_ms(100);
+    }
+
+    delay.delay_ms(90_000);
+
+    //notification 1
+    // on 200ms
+    channel_a.set_duty_cycle(10).unwrap();
+    delay.delay_ms(200);
+    // off 100ms
+    channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+    delay.delay_ms(100);
+    // on 500ms
+    channel_a.set_duty_cycle(10).unwrap();
+    delay.delay_ms(500);
+
+    channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+
+    delay.delay_ms(90_000);
+
+   
+
+    //notification 4
+    // on 500ms
+    channel_a.set_duty_cycle(10).unwrap();
+    delay.delay_ms(500);
+    // off 100ms
+    channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+    delay.delay_ms(100);
+    // on 200ms
+    channel_a.set_duty_cycle(10).unwrap();
+    delay.delay_ms(200);
+    channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+
+    delay.delay_ms(90_000);
+
+
+
+     //notification 2
+     for _ in 0..3 {
+        // on 200ms
+        channel_a.set_duty_cycle(20).unwrap();
+        delay.delay_ms(200);
+        // off 100ms
+        channel_a.set_duty_cycle_fully_off().unwrap(); // turn motor off
+        delay.delay_ms(100);
+    }
+
+
+    // delay.delay_ms(60_000);
+    loop{}
+
+
+    // }
 
     // // Set up the USB driver
     // let usb_bus = UsbBusAllocator::new(hal::usb::UsbBus::new(
